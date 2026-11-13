@@ -1,0 +1,50 @@
+# yatr - https://github.com/cargopete/yatr
+#
+# Task names match every nuthatch-org nest, so `yatr ci` means the same everywhere.
+# The aggregate is `ci`, not `check`: `yatr check` is a builtin and shadows a task of that name.
+# These tasks need the `nuthatch` binary on PATH (cargo install nuthatch).
+# Two nests, one per chain. mainnet/ commits no derived artifacts, so drift covers arbitrum-one/ only.
+
+[settings]
+cache = true
+
+[tasks.gen]
+desc = "Regenerate schema.json / llms.txt / semantic.toml in both nests"
+parallel = true
+run = ["nuthatch schema --dir arbitrum-one", "nuthatch schema --dir mainnet"]
+sources = ["*/nuthatch.toml", "*/abis/**/*.json"]
+no_cache = true
+
+[tasks.drift]
+desc = "Fail if arbitrum-one's derived artifacts are stale against its nuthatch.toml"
+cwd = "arbitrum-one"
+run = [
+    "nuthatch schema",
+    "git diff --exit-code -- schema.json llms.txt semantic.toml",
+]
+sources = ["nuthatch.toml", "abis/**/*.json", "schema.json", "llms.txt", "semantic.toml"]
+
+[tasks.doctor]
+desc = "Probe both nests' configured RPC endpoints for getLogs width and archive depth"
+parallel = true
+run = ["nuthatch doctor --dir arbitrum-one", "nuthatch doctor --dir mainnet"]
+no_cache = true
+
+[tasks.dev-arbitrum-one]
+desc = "Index and serve the Arbitrum One nest locally"
+cwd = "arbitrum-one"
+run = ["nuthatch dev --window 16000"]
+foreground = true
+no_cache = true
+
+[tasks.dev-mainnet]
+desc = "Index and serve the mainnet nest locally"
+cwd = "mainnet"
+run = ["nuthatch dev --window 16000"]
+foreground = true
+no_cache = true
+
+[tasks.ci]
+desc = "What CI can run without RPC access or indexed data: drift only"
+depends = ["drift"]
+run = []
